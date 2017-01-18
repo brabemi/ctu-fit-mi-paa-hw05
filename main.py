@@ -78,15 +78,16 @@ def crossover(SAT, population, pop_size, cross_f):
         while a==b:
             b = random.randint(0, pop_size-1)
         d = random.randint(0, size)
-        print(a, b, d)
+        # print(a, b, d)
         individual = { 'dna': [ population[a]['dna'][i] if (i < d) else population[b]['dna'][i] for i in range(size) ] }
         fill_properties(SAT, individual)
         # repair_individual(SAT, individual)
-        pprint(individual)
+        # pprint(individual)
         population.append(individual)
     # return population
 
 def mutation(SAT, population, elites, mut_f, mut_s):
+    # print(mut_f, mut_s)
     pop_size = len(population)
     mutants_cnt = math.ceil(pop_size*mut_f)
     size = SAT['var_cnt']
@@ -99,13 +100,25 @@ def mutation(SAT, population, elites, mut_f, mut_s):
         if a < len(elites):
             elites[a][1] = True
 
+def deduplication(SAT, population):
+    population_sort(population)
+    clause_cnt = SAT['clause_cnt']
+    pattern = 0
+    for i in range(1, len(population)):
+        if population[i] == population[pattern]:
+            population[i]['clauses'] -= clause_cnt
+        else:
+            pattern = i
+
 def evolution(SAT, pop_size, gen_cnt):
     population = init_population(SAT, pop_size)
     population_sort(population)
     elite_cnt = 1
-    cross_f = 0.5
+    cross_f = 0.75
     mutation_f = 0.1
-    mutation_size = 0.25
+    mutation_size = 0.2
+    dna_degradation = 0
+    dna_d_delta = 0.02
     # pprint(population)
     for g in range(gen_cnt):
         elites = []
@@ -115,14 +128,29 @@ def evolution(SAT, pop_size, gen_cnt):
         crossover(SAT, population, pop_size, cross_f)
         # pprint(population)
         # mutate
-        mutation(SAT, population, elites, mutation_f, mutation_size)
+        mutation(SAT, population, elites, mutation_f+dna_degradation, mutation_size+(0.33*dna_degradation))
         # pprint(population)
         for ind in elites:
             if ind[1]:
                 population.append(ind[0])
+        # deduplication
+        # pprint(population)
+        deduplication(SAT, population)
+        # pprint(population)
         population_sort(population)
+        if population[0]['dna'] == elites[0][0]['dna'] and dna_degradation<0.5 :
+            dna_degradation += dna_d_delta
+            # print(dna_degradation)
+        else:
+            # if dna_degradation > 0:
+            #     pprint(population[0])
+            #     pprint(elites[0][0])
+            dna_degradation = 0
         population = population[:pop_size]
-        pprint(population)
+        print('{}: c={}, w={}'.format(g+1, population[0]['clauses'], population[0]['weight']))
+        # print(population[1]['clauses'], population[1]['weight'])
+        # print(population[2]['clauses'], population[2]['weight'])
+        # print()
 
 @click.command()
 @click.option(
@@ -130,10 +158,26 @@ def evolution(SAT, pop_size, gen_cnt):
     type=click.Path(exists=True, file_okay=True, dir_okay=False, writable=False, readable=True, resolve_path=True),
     help='path to file with input', prompt='Enter path to file with input'
 )
-def main(input_file):
+@click.option(
+    '--population', '-p', default=100, type=click.IntRange(1, 1000000),
+    help='size of population'
+)
+@click.option(
+    '--generations', '-g', default=100, type=click.IntRange(1, 1000000),
+    help='number of generations'
+)
+def main(input_file, population, generations):
     SAT = load_input(input_file)
     SAT['var_to_cla'] = var_to_cla_map(SAT)
-    evolution(SAT, 10, 10)
+    evolution(SAT, population, generations)
+    # ind1 = make_individual(SAT['var_cnt'])
+    # ind2 = make_individual(SAT['var_cnt'])
+    # ind3 = copy.deepcopy(ind1)
+    # print(ind1)
+    # print(ind2)
+    # print(ind3)
+    # print(ind1 == ind2)
+    # print(ind1 == ind3)
     # population = init_population(SAT, 10)
     # population_sort(population)
     # pprint(population)
