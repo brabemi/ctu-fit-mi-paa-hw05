@@ -110,13 +110,13 @@ def deduplication(SAT, population):
         else:
             pattern = i
 
-def evolution(SAT, pop_size, gen_cnt):
+def evolution(SAT, pop_size, gen_cnt, cross_factor):
     population = init_population(SAT, pop_size)
     population_sort(population)
     elite_cnt = 1
-    cross_f = 0.75
+    # cross_factor = 0.6
     mutation_f = 0.1
-    mutation_size = 0.2
+    mutation_size = 0.25
     dna_degradation = 0
     dna_d_delta = 0.02
     # pprint(population)
@@ -124,33 +124,30 @@ def evolution(SAT, pop_size, gen_cnt):
         elites = []
         for i in range(elite_cnt):
             elites.append([copy.deepcopy(population[i]),False])
-        # cross
-        crossover(SAT, population, pop_size, cross_f)
-        # pprint(population)
         # mutate
-        mutation(SAT, population, elites, mutation_f+dna_degradation, mutation_size+(0.33*dna_degradation))
-        # pprint(population)
+        mutation(SAT, population, elites, mutation_f+dna_degradation, mutation_size+(0.4*dna_degradation))
+        # cross
+        crossover(SAT, population, pop_size, cross_factor)
         for ind in elites:
             if ind[1]:
                 population.append(ind[0])
-        # deduplication
-        # pprint(population)
+        # deduplicate
         deduplication(SAT, population)
-        # pprint(population)
         population_sort(population)
-        if population[0]['dna'] == elites[0][0]['dna'] and dna_degradation<0.5 :
+        if population[0]['dna'] == elites[0][0]['dna'] and dna_degradation+mutation_f<0.75:
+            # if dna_degradation+mutation_f<0.6:
             dna_degradation += dna_d_delta
-            # print(dna_degradation)
         else:
-            # if dna_degradation > 0:
-            #     pprint(population[0])
-            #     pprint(elites[0][0])
             dna_degradation = 0
         population = population[:pop_size]
-        print('{}: c={}, w={}'.format(g+1, population[0]['clauses'], population[0]['weight']))
-        # print(population[1]['clauses'], population[1]['weight'])
-        # print(population[2]['clauses'], population[2]['weight'])
-        # print()
+        # print('{}: {}, {}, {}, {}, {}, {}'.format(
+        print('{};{};{};{};{};{};{}'.format(
+            g+1, population[0]['clauses'], population[0]['weight'],
+            population[pop_size//2]['clauses'], population[pop_size//2]['weight'],
+            population[-1]['clauses'], population[-1]['weight']
+        ))
+        # if population[0]['clauses'] == SAT['clause_cnt']:
+            # break;
 
 @click.command()
 @click.option(
@@ -166,10 +163,14 @@ def evolution(SAT, pop_size, gen_cnt):
     '--generations', '-g', default=100, type=click.IntRange(1, 1000000),
     help='number of generations'
 )
-def main(input_file, population, generations):
+@click.option(
+	'--cross-factor', '-c', default=0.75, type=click.FLOAT,
+	help='how many children are born in each generation, CROSS-FACTOR*POPULATION_SIZE'
+)
+def main(input_file, population, generations, cross_factor):
     SAT = load_input(input_file)
     SAT['var_to_cla'] = var_to_cla_map(SAT)
-    evolution(SAT, population, generations)
+    evolution(SAT, population, generations, cross_factor)
     # ind1 = make_individual(SAT['var_cnt'])
     # ind2 = make_individual(SAT['var_cnt'])
     # ind3 = copy.deepcopy(ind1)
